@@ -1,0 +1,10 @@
+{
+  "history_forecast_ratio": 10,
+  "dropout": 0.0,
+  "n_epochs": 300,
+  "batch_size": 16,
+  "random_state": 0,
+  "optimizer_kwargs": {"lr": 1e-3},
+  "input_chunk_length": 30,
+  "output_chunk_length": 6
+}
