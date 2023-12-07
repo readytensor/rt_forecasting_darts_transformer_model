@@ -1,8 +1,7 @@
 {
-  "history_forecast_ratio": 10,
-  "lags_forecast_ratio": 3,
+  "history_forecast_ratio": 20,
   "dropout": 0.0,
-  "n_epochs": 250,
+  "n_epochs": 300,
   "batch_size": 16,
   "random_state": 0,
   "optimizer_kwargs": {"lr": 1e-3},
@@ -10,5 +9,9 @@
   "nhead": 2,
   "num_encoder_layers": 1,
   "num_decoder_layers": 1,
-  "dim_feedforward": 128
+  "dim_feedforward": 128,
+  "input_chunk_length": 20,
+  "output_chunk_length": 6,
+  "force_reset": true
+
 }
