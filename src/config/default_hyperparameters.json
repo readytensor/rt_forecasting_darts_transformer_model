@@ -4,7 +4,5 @@
   "n_epochs": 200,
   "batch_size": 16,
   "random_state": 0,
-  "optimizer_kwargs": {"lr": 1e-3},
-  "input_chunk_length": 30,
-  "output_chunk_length": 6
+  "optimizer_kwargs": {"lr": 1e-3}
 }
