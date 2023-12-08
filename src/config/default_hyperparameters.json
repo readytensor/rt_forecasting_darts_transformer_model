@@ -1,5 +1,5 @@
 {
-  "history_forecast_ratio": 20,
+  "history_forecast_ratio": 10,
   "dropout": 0.0,
   "n_epochs": 300,
   "batch_size": 16,
