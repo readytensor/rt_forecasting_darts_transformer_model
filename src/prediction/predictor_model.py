@@ -10,6 +10,7 @@ from schema.data_schema import ForecastingSchema
 from sklearn.exceptions import NotFittedError
 from torch import cuda
 from sklearn.preprocessing import MinMaxScaler
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 
 warnings.filterwarnings("ignore")
@@ -31,8 +32,10 @@ class Forecaster:
     def __init__(
         self,
         data_schema: ForecastingSchema,
-        input_chunk_length: int,
-        output_chunk_length: int,
+        input_chunk_length: int = None,
+        output_chunk_length: int = None,
+        history_forecast_ratio: int = None,
+        lags_forecast_ratio: int = None,
         d_model: int = 64,
         nhead: int = 4,
         num_encoder_layers: int = 3,
@@ -42,6 +45,7 @@ class Forecaster:
         activation: str = "relu",
         norm_type: Optional[str] = None,
         optimizer_kwargs: Optional[Dict] = None,
+        use_exogenous: bool = None,
         random_state: Optional[int] = 0,
         **kwargs,
     ):
@@ -51,6 +55,7 @@ class Forecaster:
             input_chunk_length (int):
                 Number of time steps in the past to take as a model input (per chunk). Applies to the target series,
                 and past and/or future covariates (if the model supports it).
+                Note: If this parameter is not specified, lags_forecast_ratio has to be specified.
 
             output_chunk_length (int):
                 Number of time steps predicted at once (per chunk) by the internal model.
@@ -61,6 +66,19 @@ class Forecaster:
                 This is useful when the covariates don't extend far enough into the future,
                 or to prohibit the model from using future values of past and / or future covariates for prediction
                 (depending on the model's covariate support).
+                Note: If this parameter is not specified, lags_forecast_ratio has to be specified.
+
+
+            history_forecast_ratio (int):
+                Sets the history length depending on the forecast horizon.
+                For example, if the forecast horizon is 20 and the history_forecast_ratio is 10,
+                history length will be 20*10 = 200 samples.
+
+
+            lags_forecast_ratio (int):
+                Sets the input_chunk_length and output_chunk_length parameters depending on the forecast horizon.
+                input_chunk_length = forecast horizon * lags_forecast_ratio
+                output_chunk_length = forecast horizon
 
             d_model (int):
                 The number of expected features in the transformer encoder/decoder inputs (default=64).
@@ -95,8 +113,10 @@ class Forecaster:
                 Optionally, some keyword arguments for the PyTorch optimizer (e.g., {'lr': 1e-3} for specifying a learning rate).
                 Otherwise the default values of the selected optimizer_cls will be used. Default: None.
 
-            random_state (int): Sets the underlying random seed at model initialization time.
+            use_exogenous (bool):
+                If true, use covariates in training.
 
+            random_state (int): Sets the underlying random seed at model initialization time.
 
             **kwargs: Optional arguments to initialize the pytorch_lightning.Module, pytorch_lightning.Trainer, and Darts' TorchForecastingModel.
         """
@@ -112,26 +132,32 @@ class Forecaster:
         self.activation = activation
         self.norm_type = norm_type
         self.optimizer_kwargs = optimizer_kwargs
+        self.use_exogenous = use_exogenous
         self.random_state = random_state
         self._is_trained = False
         self.kwargs = kwargs
 
-        if not data_schema.past_covariates:
-            self.lags_past_covariates = None
+        if history_forecast_ratio:
+            self.history_length = (
+                self.data_schema.forecast_length * history_forecast_ratio
+            )
 
-        if not data_schema.future_covariates:
-            self.lags_future_covariates = None
+        if lags_forecast_ratio:
+            lags = self.data_schema.forecast_length * lags_forecast_ratio
+            self.input_chunk_length = lags
+            self.output_chunk_length = self.data_schema.forecast_length
 
-        self.history_length = None
-        if kwargs.get("history_length"):
-            self.history_length = kwargs["history_length"]
-            kwargs.pop("history_length")
+        stopper = EarlyStopping(
+            monitor="train_loss",
+            patience=30,
+            min_delta=0.0005,
+            mode="min",
+        )
 
-        pl_trainer_kwargs = None
+        pl_trainer_kwargs = {"callbacks": [stopper]}
+
         if cuda.is_available():
-            pl_trainer_kwargs = {
-                "accelerator": "gpu",
-            }
+            pl_trainer_kwargs["accelerator"] = "gpu"
             print("GPU training is available.")
         else:
             print("GPU training not available.")
@@ -175,7 +201,7 @@ class Forecaster:
         future = []
 
         future_covariates_names = data_schema.future_covariates
-        if data_schema.time_col_dtype == "DATE":
+        if data_schema.time_col_dtype in ["DATE", "DATETIME"]:
             date_col = pd.to_datetime(history[data_schema.time_col])
             year_col = date_col.dt.year
             month_col = date_col.dt.month
@@ -293,9 +319,13 @@ class Forecaster:
             data_schema=data_schema,
             test_dataframe=test_dataframe,
         )
+
+        if not self.use_exogenous:
+            past_covariates = None
+
         self.model.fit(
             targets,
-            # past_covariates=past_covariates,
+            past_covariates=past_covariates,
         )
         self._is_trained = True
         self.data_schema = data_schema
@@ -320,7 +350,7 @@ class Forecaster:
         predictions = self.model.predict(
             n=self.data_schema.forecast_length,
             series=self.targets_series,
-            # past_covariates=self.past_covariates,
+            past_covariates=self.past_covariates,
         )
         prediction_values = []
         for index, prediction in enumerate(predictions):
