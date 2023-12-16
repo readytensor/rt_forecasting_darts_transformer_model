@@ -136,6 +136,7 @@ class Forecaster:
         self.random_state = random_state
         self._is_trained = False
         self.kwargs = kwargs
+        self.history_length = None
 
         if history_forecast_ratio:
             self.history_length = (
