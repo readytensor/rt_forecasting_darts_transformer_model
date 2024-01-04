@@ -22,7 +22,7 @@ Past :white_check_mark:
 
 Future :x:
 
-Static :x:
+Static :white_check_mark:
 
 ---
 

@@ -243,18 +243,17 @@ class Forecaster:
             target = TimeSeries.from_dataframe(s, value_cols=data_schema.target)
             targets.append(target)
 
-            if data_schema.past_covariates:
+            past_static_covariates = (
+                data_schema.past_covariates + data_schema.static_covariates
+            )
+            if past_static_covariates:
                 original_values = (
-                    s[data_schema.past_covariates].values.reshape(-1, 1)
-                    if len(data_schema.past_covariates) == 1
-                    else s[data_schema.past_covariates].values
+                    s[past_static_covariates].values.reshape(-1, 1)
+                    if len(past_static_covariates) == 1
+                    else s[past_static_covariates].values
                 )
-                s[data_schema.past_covariates] = past_scaler.fit_transform(
-                    original_values
-                )
-                past_covariates = TimeSeries.from_dataframe(
-                    s[data_schema.past_covariates]
-                )
+                s[past_static_covariates] = past_scaler.fit_transform(original_values)
+                past_covariates = TimeSeries.from_dataframe(s[past_static_covariates])
                 past.append(past_covariates)
 
         if future_covariates_names:
