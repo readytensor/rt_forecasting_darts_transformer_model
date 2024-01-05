@@ -184,7 +184,7 @@ class Forecaster:
         history: pd.DataFrame,
         data_schema: ForecastingSchema,
         history_length: int = None,
-        test_dataframe: pd.DataFrame = None,
+        # test_dataframe: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """
         Puts the data into the expected shape by the forecaster.
@@ -212,11 +212,11 @@ class Forecaster:
             history[month_col_name] = month_col
             future_covariates_names += [year_col_name, month_col_name]
 
-            date_col = pd.to_datetime(test_dataframe[data_schema.time_col])
+            # date_col = pd.to_datetime(test_dataframe[data_schema.time_col])
             year_col = date_col.dt.year
             month_col = date_col.dt.month
-            test_dataframe[year_col_name] = year_col
-            test_dataframe[month_col_name] = month_col
+            # test_dataframe[year_col_name] = year_col
+            # test_dataframe[month_col_name] = month_col
 
         groups_by_ids = history.groupby(data_schema.id_col)
         all_ids = list(groups_by_ids.groups.keys())
@@ -256,22 +256,19 @@ class Forecaster:
                 past_covariates = TimeSeries.from_dataframe(s[past_static_covariates])
                 past.append(past_covariates)
 
+        future_scalers = {}
         if future_covariates_names:
-            test_groups_by_ids = test_dataframe.groupby(data_schema.id_col)
-            test_all_series = [
-                test_groups_by_ids.get_group(id_).drop(columns=data_schema.id_col)
-                for id_ in all_ids
-            ]
+            # test_groups_by_ids = test_dataframe.groupby(data_schema.id_col)
+            # test_all_series = [
+            #     test_groups_by_ids.get_group(id_).drop(columns=data_schema.id_col)
+            #     for id_ in all_ids
+            # ]
 
-            for train_series, test_series in zip(all_series, test_all_series):
+            for id, train_series in zip(all_ids, all_series):
                 if history_length:
                     train_series = train_series.iloc[-self.history_length :]
 
-                train_future_covariates = train_series[future_covariates_names]
-                test_future_covariates = test_series[future_covariates_names]
-                future_covariates = pd.concat(
-                    [train_future_covariates, test_future_covariates], axis=0
-                )
+                future_covariates = train_series[future_covariates_names]
 
                 future_covariates.reset_index(inplace=True)
                 future_scaler = MinMaxScaler()
@@ -283,12 +280,15 @@ class Forecaster:
                 future_covariates[
                     future_covariates_names
                 ] = future_scaler.fit_transform(original_values)
+
                 future_covariates = TimeSeries.from_dataframe(
                     future_covariates[future_covariates_names]
                 )
+                future_scalers[id] = future_scaler
                 future.append(future_covariates)
 
         self.scalers = scalers
+        self.future_scalers = future_scalers
         if not past:
             past = None
         if not future:
@@ -317,7 +317,7 @@ class Forecaster:
             history=history,
             history_length=history_length,
             data_schema=data_schema,
-            test_dataframe=test_dataframe,
+            # test_dataframe=test_dataframe,
         )
 
         if not self.use_exogenous:
