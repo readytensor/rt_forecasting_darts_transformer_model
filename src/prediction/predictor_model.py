@@ -45,7 +45,7 @@ class Forecaster:
         activation: str = "relu",
         norm_type: Optional[str] = None,
         optimizer_kwargs: Optional[Dict] = None,
-        use_exogenous: bool = None,
+        use_exogenous: bool = True,
         random_state: Optional[int] = 0,
         **kwargs,
     ):
@@ -138,6 +138,9 @@ class Forecaster:
         self.kwargs = kwargs
         self.history_length = None
 
+        if not self.output_chunk_length:
+            self.output_chunk_length = self.data_schema.forecast_length
+
         if history_forecast_ratio:
             self.history_length = (
                 self.data_schema.forecast_length * history_forecast_ratio
@@ -146,7 +149,6 @@ class Forecaster:
         if lags_forecast_ratio:
             lags = self.data_schema.forecast_length * lags_forecast_ratio
             self.input_chunk_length = lags
-            self.output_chunk_length = self.data_schema.forecast_length
 
         stopper = EarlyStopping(
             monitor="train_loss",
