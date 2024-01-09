@@ -13,6 +13,6 @@
   "input_chunk_length": 20,
   "output_chunk_length": 3,
   "force_reset": true,
-  "use_exogenous": false
+  "use_exogenous": true
 
 }
