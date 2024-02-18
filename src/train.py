@@ -1,10 +1,8 @@
 import argparse
-import os
 from config import paths
 from data_models.data_validator import validate_data
 from logger import get_logger, log_error
 from prediction.predictor_model import (
-    evaluate_predictor_model,
     save_predictor_model,
     train_predictor_model,
 )
