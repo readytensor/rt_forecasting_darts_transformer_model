@@ -34,16 +34,14 @@ class Forecaster:
     def __init__(
         self,
         data_schema: ForecastingSchema,
-        input_chunk_length: int = None,
-        output_chunk_length: int = None,
         history_forecast_ratio: int = None,
-        lags_forecast_ratio: int = None,
+        lags_forecast_ratio: int = 4,
         d_model: int = 64,
-        nhead: int = 4,
-        num_encoder_layers: int = 3,
-        num_decoder_layers: int = 3,
-        dim_feedforward: int = 512,
-        dropout: float = 0.1,
+        nhead: int = 2,
+        num_encoder_layers: int = 1,
+        num_decoder_layers: int = 1,
+        dim_feedforward: int = 32,
+        dropout: float = 0.05,
         activation: str = "relu",
         norm_type: Optional[str] = None,
         optimizer_kwargs: Optional[Dict] = None,
@@ -53,24 +51,7 @@ class Forecaster:
     ):
         """Construct a new Transformer Forecaster
 
-        Args:
-            input_chunk_length (int):
-                Number of time steps in the past to take as a model input (per chunk). Applies to the target series,
-                and past and/or future covariates (if the model supports it).
-                Note: If this parameter is not specified, lags_forecast_ratio has to be specified.
-
-            output_chunk_length (int):
-                Number of time steps predicted at once (per chunk) by the internal model.
-                Also, the number of future values from future covariates to use as a model input (if the model supports future covariates).
-                It is not the same as forecast horizon n used in predict(), which is the desired number of
-                prediction points generated using either a one-shot- or auto-regressive forecast.
-                Setting n <= output_chunk_length prevents auto-regression.
-                This is useful when the covariates don't extend far enough into the future,
-                or to prohibit the model from using future values of past and / or future covariates for prediction
-                (depending on the model's covariate support).
-                Note: If this parameter is not specified, lags_forecast_ratio has to be specified.
-
-
+        Args:          
             history_forecast_ratio (int):
                 Sets the history length depending on the forecast horizon.
                 For example, if the forecast horizon is 20 and the history_forecast_ratio is 10,
@@ -123,8 +104,6 @@ class Forecaster:
             **kwargs: Optional arguments to initialize the pytorch_lightning.Module, pytorch_lightning.Trainer, and Darts' TorchForecastingModel.
         """
         self.data_schema = data_schema
-        self.input_chunk_length = input_chunk_length
-        self.output_chunk_length = output_chunk_length
         self.d_model = d_model
         self.nhead = nhead
         self.num_encoder_layers = num_encoder_layers
@@ -140,17 +119,14 @@ class Forecaster:
         self.kwargs = kwargs
         self.history_length = None
 
-        if not self.output_chunk_length:
-            self.output_chunk_length = self.data_schema.forecast_length
+        self.output_chunk_length = self.data_schema.forecast_length
 
         if history_forecast_ratio:
             self.history_length = (
                 self.data_schema.forecast_length * history_forecast_ratio
             )
 
-        if lags_forecast_ratio:
-            lags = self.data_schema.forecast_length * lags_forecast_ratio
-            self.input_chunk_length = lags
+        self.input_chunk_length = int(self.data_schema.forecast_length * lags_forecast_ratio)
 
         stopper = EarlyStopping(
             monitor="train_loss",
